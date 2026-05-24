@@ -2,6 +2,7 @@
   "name": "assistant",
   "version": "1.0.0",
   "main": "app.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -10,6 +11,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "ollama": "^0.6.3"
+    "@langchain/community": "^1.1.28",
+    "@langchain/core": "^1.1.48",
+    "langchain": "^1.4.2",
+    "ollama": "^0.6.3",
+    "zod": "^4.4.3"
   }
 }
