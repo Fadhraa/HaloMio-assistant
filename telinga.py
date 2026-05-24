@@ -17,17 +17,24 @@ def main():
         with m as source:
             try:
                 # Mendengarkan suara (timeout=1 agar tidak ngehang, batas kalimat=5 detik)
-                audio = r.listen(source, timeout=1, phrase_time_limit=5)
+                audio = r.listen(source, timeout=1, phrase_time_limit=10)
                 
                 # Mengubah rekaman suara jadi teks (Bahasa Indonesia)
                 teks = r.recognize_google(audio, language="id-ID").lower()
              
                 
-                # Cek kata kunci rahasia (Wake Word)
-                # (Terkadang STT Google salah dengar "mio" jadi "neo" atau "mil", Anda bisa menambahkan variasinya nanti)
-                if "halo mio" in teks: 
-                    # Ambil perintah setelah kata "halo mio"
-                    perintah = teks.split("halo mio")[-1].strip()
+
+                variasi_panggilan = ["halo mio", "hallo mio", "halo miu", "halo miow", "halo neo", "halo mil", "halo bio","hellow mio", "hello miyo", "halo miyoh", "hallo miyoh" ]
+                
+                # 2. Cari tahu apakah dari daftar di atas, ada SATU SAJA yang terdeteksi di suara Anda
+                panggilan_terdeteksi = None
+                for panggilan in variasi_panggilan:
+                    if panggilan in teks:
+                        panggilan_terdeteksi = panggilan
+                        break
+                
+                if panggilan_terdeteksi: 
+                    perintah = teks.split(panggilan_terdeteksi)[-1].strip()
                     
                     if perintah:
                         # Print perintahnya agar BISA DIBACA oleh Node.js

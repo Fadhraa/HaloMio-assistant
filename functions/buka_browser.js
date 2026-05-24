@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { tool } from '@langchain/core/tools';
-import { z } from "zod"
+import { z } from "zod";
+
 const pintasanWeb = {
     "youtube": "https://www.youtube.com",
     "yt": "https://www.youtube.com",
@@ -10,29 +11,50 @@ const pintasanWeb = {
     "wa": "https://web.whatsapp.com",
     "chatgpt": "https://chatgpt.com",
     "google": "https://www.google.com"
-}
-export const toolBukaBrowser = tool(async ({ query }) => {
-    let url
-    const katakunci = query.toLowerCase();
-    if (pintasanWeb[katakunci]) {
-        url = pintasanWeb[katakunci]
+};
 
-    } else if (query.includes('.') && !query.includes(' ')) {
-        url = query.startsWith('http') ? query : `https://${query}`;
-    } else {
-        url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+export const toolBukaBrowser = tool(async ({ website, kata_kunci }) => {
+    let url;
+    const target = website.toLowerCase();
+
+    // 1. JIKA USER MINTA PENCARIAN (contoh: "Cari lagu pop di Youtube")
+    if (kata_kunci) {
+        if (target === "youtube" || target === "yt") {
+            // Gunakan format URL pencarian khusus Youtube
+            url = `https://www.youtube.com/results?search_query=${encodeURIComponent(kata_kunci)}`;
+        } else {
+            // Jika website lain (atau tidak jelas), default cari pakai Google
+            url = `https://www.google.com/search?q=${encodeURIComponent(kata_kunci)}`;
+        }
+        console.log(`Mio sedang mencari "${kata_kunci}" di ${website}...`);
     }
-    console.log("Mio sedang membuka browser untuk", query);
+    // 2. JIKA USER HANYA MINTA BUKA BERANDA (contoh: "Buka Youtube")
+    else {
+        if (pintasanWeb[target]) {
+            url = pintasanWeb[target];
+        } else if (website.includes('.') && !website.includes(' ')) {
+            url = website.startsWith('http') ? website : `https://${website}`;
+        } else {
+            url = `https://www.google.com/search?q=${encodeURIComponent(website)}`;
+        }
+        console.log(`Mio sedang membuka halaman beranda ${website}...`);
+    }
+
+    // Menjalankan Browser
     exec(`start "" "${url}"`, (error) => {
         if (error) {
             console.error(`Mio: Maaf, gagal membuka browser. Error: ${error.message}`);
         }
     });
-    return `Sukses. Browser telah di buka untuk "${query}"`
+
+    return `Sukses. Browser telah dibuka untuk "${kata_kunci ? kata_kunci : website}"`;
+
 }, {
     name: 'buka_browser',
-    description: 'Gunakan tool ini SETIAP USER meminta untuk membuka website, aplikasi web, atau mencari informasi di google atau internet. JANGAN gunakan tool ini untuk tugas lainnya.',
+    description: 'Gunakan alat ini untuk membuka website atau mencari sesuatu di website tertentu.',
+    // KEAJAIBAN ZOD ADA DI SINI: Kita minta AI memisahkan datanya
     schema: z.object({
-        query: z.string().describe('Nama website atau kata kunci pencarian murni yang ingin dibuka')
+        website: z.string().describe('Situs web target, contoh: "youtube", "google", atau "netflix"'),
+        kata_kunci: z.string().optional().describe('Benda/video/lagu spesifik yang ingin dicari di website tersebut. KOSONGKAN jika user hanya ingin membuka halaman depannya saja.')
     })
-})
+});
