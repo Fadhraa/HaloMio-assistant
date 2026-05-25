@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { tool } from '@langchain/core/tools';
 import { z } from "zod";
+import ytSearch from 'yt-search';
 
 const pintasanWeb = {
     "youtube": "https://www.youtube.com",
@@ -20,8 +21,25 @@ export const toolBukaBrowser = tool(async ({ website, kata_kunci }) => {
     // 1. JIKA USER MINTA PENCARIAN (contoh: "Cari lagu pop di Youtube")
     if (kata_kunci) {
         if (target === "youtube" || target === "yt") {
+            console.log(`Mio sedang mencari video "${kata_kunci}"...`);
             // Gunakan format URL pencarian khusus Youtube
-            url = `https://www.youtube.com/results?search_query=${encodeURIComponent(kata_kunci)}`;
+            try {
+                // Mencari video secara diam-diam di belakang layar
+                const hasilPencarian = await ytSearch(kata_kunci);
+                const videoPertama = hasilPencarian.videos[0]; // Ambil video urutan pertama
+
+                if (videoPertama) {
+                    // Jika ketemu, langsung gunakan URL video tersebut (yang akan otomatis play)
+                    url = videoPertama.url;
+                    console.log(`Menemukan video: ${videoPertama.title}`);
+                } else {
+                    // Jika anehnya tidak ada video yang cocok, kembalikan ke pencarian biasa
+                    url = `https://www.youtube.com/results?search_query=${encodeURIComponent(kata_kunci)}`;
+                }
+            } catch (err) {
+                url = `https://www.youtube.com/results?search_query=${encodeURIComponent(kata_kunci)}`;
+            }
+
         } else {
             // Jika website lain (atau tidak jelas), default cari pakai Google
             url = `https://www.google.com/search?q=${encodeURIComponent(kata_kunci)}`;

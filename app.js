@@ -6,23 +6,39 @@ import { createToolCallingAgent, AgentExecutor } from "@langchain/classic/agents
 
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 
-// 1. MENGIMPOR TOOL YANG BARU SAJA ANDA BUAT (Jangan lupa akhiran .js)
+// fungsi buka browser
 import { toolBukaBrowser } from './functions/buka_browser.js';
 // fungsi mengambil waktu saat ini
 import { get_currentTime } from "./functions/get_currentTime.js";
-// using model
+// fungsi aktivitas
+import { toolCekAktivitas } from "./functions/cek_aktivitas.js";
+// buka aplikasi
+import { toolBukaAplikasi } from "./functions/buka_aplikasi.js";
+// Membaca kebiasaan fadhra
+import { toolCatatKebiasaan } from "./functions/catat_kebiasaan.js";
+import { dapatkanMemoriRelevan } from "./functions/habit_memory.js";
+// pemakaian model
 const Brain = new ChatOllama({
     model: "minimax-m2.5:cloud",
+    // model: "gemma4:31b-cloud",
     temperature: 0
 });
 const rulesAi = ChatPromptTemplate.fromMessages([
     ["system", `Kamu adalah asisten AI di komputer Fadhra bernama Mio. Jadilah asisten yang ramah buat fadhra. 
 Gunakan alat (tools) yang tersedia HANYA jika pengguna menyuruhmu membuka aplikasi, website, mencari sesuatu di internet, atau memutar musik.
-Jika Fadhra hanya mengajak ngobrol, jawablah dengan bahasa Indonesia yang santai tanpa menggunakan tool.`],
+Jika Fadhra hanya mengajak ngobrol, jawablah dengan bahasa Indonesia yang santai tanpa menggunakan tool.
+Berikut preferensi/kebiasaan Fadhra yang mungkin relevan dengan percakapan saat ini:
+{memori_kebiasaan}`],
     ["human", "{input}"],
     ["placeholder", "{agent_scratchpad}"],
 ])
-const listTools = [toolBukaBrowser, get_currentTime]
+const listTools = [
+    toolBukaBrowser,
+    get_currentTime,
+    toolCekAktivitas,
+    toolBukaAplikasi,
+    toolCatatKebiasaan
+];
 
 // creating agent
 const Mio = createToolCallingAgent({
@@ -44,7 +60,10 @@ async function prosesWithAi(text) {
         process.exit(0);
     };
     try {
-        const result = await executer.invoke({ input: promptUser });
+        // Dapatkan memori relevan sebelum memanggil agent
+        const memori = await dapatkanMemoriRelevan(promptUser);
+
+        const result = await executer.invoke({ input: promptUser, memori_kebiasaan: memori });
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0);
 
@@ -54,6 +73,7 @@ async function prosesWithAi(text) {
         readline.cursorTo(process.stdout, 0);
 
         console.log("Mio: Maaf, sepertinya ada kesalahan.");
+        console.error("[DEBUG ERROR]:", error);
     }
 }
 // input voice or keyboard
@@ -107,6 +127,7 @@ telinga.stdout.on('data', async (data) => {
         console.log(`🦻 RAW: ${hasilSuara}`);
     }
 })
+const pelacak = spawn('node', ['track.js'], { cwd: '../tracking' });
 telinga.stderr.on('data', (data) => {
     console.error(`[Mic Error]: ${data}`);
 });
