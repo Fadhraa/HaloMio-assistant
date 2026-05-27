@@ -7,7 +7,7 @@ export async function bacaData() {
     try {
         if (fs.existsSync(PATH_HABIT)) {
             const data = fs.readFileSync(PATH_HABIT, 'utf8');
-            return JSON.parse(data);
+            return data === '' ? {} : JSON.parse(data);
         }
         return {};
     } catch (error) {
@@ -27,7 +27,7 @@ export async function simpanKebiasaan(kunci, deskripsi, target) {
         log: [],
         createdAt: new Date().toISOString(),
     }
-    
+
     const dirPath = path.dirname(PATH_HABIT);
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
@@ -35,9 +35,10 @@ export async function simpanKebiasaan(kunci, deskripsi, target) {
     fs.writeFileSync(PATH_HABIT, JSON.stringify(data, null, 2));
 }
 
-export async function dapatkanMemoriRelevan(userInput) {
+export async function dapatkanKebiasaan(userInput) {
     const semuaKebiasaan = await bacaData();
-    const kataKunciUser = userInput.toLowerCase().split(/\s+/);
+    // Hilangkan tanda baca seperti ? ! , . agar tidak mengganggu pencarian
+    const kataKunciUser = userInput.toLowerCase().replace(/[^\w\s]/gi, '').split(/\s+/);
 
     let hasilPencarian = [];
 
@@ -54,7 +55,11 @@ export async function dapatkanMemoriRelevan(userInput) {
         });
 
         if (isMatch) {
-            hasilPencarian.push(`- ${kunci}: ${info.deskripsi} (Target/Aplikasi/URL: "${info.target}")`);
+            let detail = `- ${kunci}: ${info.deskripsi}`;
+            if (info.target) {
+                detail += ` (Target/Aplikasi/URL: "${info.target}")`;
+            }
+            hasilPencarian.push(detail);
         }
     }
 

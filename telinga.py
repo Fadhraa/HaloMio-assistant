@@ -3,6 +3,10 @@ import sys
 
 def main():
     r = sr.Recognizer()
+    
+    # Memberikan waktu toleransi jeda (diam) selama 2.5 detik sebelum kalimat dipotong
+    r.pause_threshold = 2.5
+    
     m = sr.Microphone()
 
     # Kalibrasi awal untuk mengukur kebisingan ruangan (kipas laptop, dll)
@@ -17,7 +21,7 @@ def main():
         with m as source:
             try:
                 # Mendengarkan suara (timeout=1 agar tidak ngehang, batas kalimat=5 detik)
-                audio = r.listen(source, timeout=1, phrase_time_limit=10)
+                audio = r.listen(source, timeout=1, phrase_time_limit=20)
                 
                 # Mengubah rekaman suara jadi teks (Bahasa Indonesia)
                 teks = r.recognize_google(audio, language="id-ID").lower()
