@@ -7,7 +7,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 // tool
 import { get_currentTime } from "../get_currentTime.js";
 import { toolBacaInformasi } from "./baca_informasi.js";
-import { toolTambahJadwal } from "./jadwal.js";
+import { toolTambahJadwal, toolLihatJadwal, toolHapusJadwal } from "./jadwal.js";
 
 // setup Nalomi
 const otakNalomi = new ChatOllama({
@@ -23,7 +23,7 @@ Kerjakan instruksi yang diberikan dengan sebaik mungkin menggunakan tool yang ka
     ["placeholder", "{agent_scratchpad}"]
 ]);
 
-const toolsNalomi = [get_currentTime, toolBacaInformasi, toolTambahJadwal];
+const toolsNalomi = [get_currentTime, toolBacaInformasi, toolTambahJadwal, toolLihatJadwal, toolHapusJadwal];
 const agentNalomi = createToolCallingAgent({
     llm: otakNalomi,
     prompt: rulesMiomi,
