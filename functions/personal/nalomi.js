@@ -6,11 +6,12 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 
 // tool
 import { get_currentTime } from "../get_currentTime.js";
-import { kelolaInformasiFadhra } from "./kelola_informasi.js";
-import { toolCatatKebiasaan } from "./catat_kebiasaan.js";
+import { toolBacaInformasi } from "./baca_informasi.js";
+import { toolTambahJadwal } from "./jadwal.js";
+
 // setup Nalomi
 const otakNalomi = new ChatOllama({
-    model: "minimax-m2.5:cloud", // Ganti dengan model pilihanmu
+    model: "minimax-m2.5:cloud",
     // model: "gemma4:31b-cloud",
     temperature: 0.1
 });
@@ -22,7 +23,7 @@ Kerjakan instruksi yang diberikan dengan sebaik mungkin menggunakan tool yang ka
     ["placeholder", "{agent_scratchpad}"]
 ]);
 
-const toolsNalomi = [get_currentTime, kelolaInformasiFadhra, toolCatatKebiasaan];
+const toolsNalomi = [get_currentTime, toolBacaInformasi, toolTambahJadwal];
 const agentNalomi = createToolCallingAgent({
     llm: otakNalomi,
     prompt: rulesMiomi,
@@ -41,7 +42,7 @@ export const panggilNalomi = tool(async ({ instruksi }) => {
     return result.output;
 }, {
     name: "panggil_agen_personal_nalomi",
-    description: "PENTING: gunakan alat ini untuk keperluan pribadi fadhra seperti membuat jadwal, dan keperluan pribadi lainnya",
+    description: "PENTING: Gunakan alat ini JIKA Fadhra menanyakan informasi/fakta masa lalu (contoh: 'siapa pacarku?', 'apa makanan kesukaanku?') ATAU untuk keperluan pribadi seperti jadwal dan alarm.",
     schema: z.object({
         instruksi: z.string().describe("Perintah lengkap dan spesifik tentang apa yang harus Nalomi kerjakan untuk Fadhra.")
     })

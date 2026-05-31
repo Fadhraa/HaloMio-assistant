@@ -3,6 +3,7 @@ import { createToolCallingAgent, AgentExecutor } from "@langchain/classic/agents
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { kelolaInformasiFadhra } from "../personal/kelola_informasi.js";
 import { toolCatatKebiasaan } from "../personal/catat_kebiasaan.js";
+import { get_currentTime } from "../get_currentTime.js";
 
 const otakObserver = new ChatOllama({
     model: "devstral-2:123b-cloud",
@@ -26,6 +27,7 @@ JIKA TIDAK ADA informasi apa-apa (hanya sapaan basi-basi atau perintah akademik)
 const toolsObserver = [
     kelolaInformasiFadhra,
     toolCatatKebiasaan,
+    get_currentTime,
 ];
 
 const agentObserver = createToolCallingAgent({

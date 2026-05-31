@@ -8,6 +8,6 @@ export const get_currentTime = tool(async () => {
     });
 }, {
     name: "get_currentTime",
-    description: "Mengambil waktu saat ini",
+    description: "Mengambil waktu dan tanggal saat ini untuk keperluan pencatatan/pembacaan waktu oleh LLM",
     schema: z.object({})
 })
