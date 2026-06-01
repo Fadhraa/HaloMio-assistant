@@ -7,11 +7,16 @@ def main():
     # Memberikan waktu toleransi jeda (diam) selama 2.5 detik sebelum kalimat dipotong
     r.pause_threshold = 2.5
     
+    # Menurunkan batas minimal volume suara agar lebih peka terhadap suara pelan
+    r.energy_threshold = 150
+    # Mematikan penyesuaian otomatis agar sensitivitas tidak menjadi 'budek' secara tiba-tiba
+    r.dynamic_energy_threshold = False
+    
     m = sr.Microphone()
 
-    # Kalibrasi awal untuk mengukur kebisingan ruangan (kipas laptop, dll)
+    # Kalibrasi awal untuk mengukur kebisingan ruangan
     with m as source:
-        r.adjust_for_ambient_noise(source, duration=1)
+        r.adjust_for_ambient_noise(source, duration=2)
     
     # Memberi sinyal ke Node.js bahwa telinga sudah siap
     print("READY", flush=True) 
@@ -28,7 +33,11 @@ def main():
              
                 
 
-                variasi_panggilan = ["halo mio", "hallo mio", "halo miu", "halo miow", "halo neo", "halo mil", "halo bio","hellow mio", "hello miyo", "halo miyoh", "hallo miyoh" ]
+                variasi_panggilan = [
+                    "halo mio", "hallo mio", "halo miu", "halo miow", "halo neo", 
+                    "halo mil", "halo bio", "hellow mio", "hello miyo", "halo miyoh", 
+                    "hallo miyoh", "halo nio", "kalau mio", "halo leo", "halo biyu"
+                ]
                 
                 # 2. Cari tahu apakah dari daftar di atas, ada SATU SAJA yang terdeteksi di suara Anda
                 panggilan_terdeteksi = None

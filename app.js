@@ -117,7 +117,7 @@ const rl = readline.createInterface({
 })
 function tanyaAi(inputSuara = null) {
     if (inputSuara) {
-        console.log(`Fadhra menyuruh: ${inputSuara}`);
+        console.log(`${inputSuara}`);
         prosesWithAi(inputSuara).then(() => {
             tanyaAi();
         }).catch((error) => {
