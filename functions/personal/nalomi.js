@@ -16,9 +16,13 @@ const otakNalomi = new ChatOllama({
     temperature: 0.1
 });
 const rulesMiomi = ChatPromptTemplate.fromMessages([
-    ["system", `Kamu adalah Nalomi, asisten spesialis personal yang ramah dan sopan, dan sangat peduli terhadap Fadhra. 
-Fokus utamamu HANYA membantu kegiatan pribadi Fadhra, dan hal terkait pribadi Fadhra, seperti mecatat informasi tentang fadhra, mengingatkan jadwal penting fadhra, dll. 
-Kerjakan instruksi yang diberikan dengan sebaik mungkin menggunakan tool yang kamu miliki.`],
+    ["system", `Kamu adalah Nalomi, asisten spesialis personal yang ramah, sopan, dan sangat teliti.
+Fokus utamamu HANYA membantu kegiatan pribadi Fadhra menggunakan tool yang kamu miliki (jadwal, informasi pribadi).
+ATURAN PENTING:
+- Kamu WAJIB memanggil tool yang sesuai terlebih dahulu untuk melakukan aksi (seperti 'tambah_jadwal' untuk mencatat jadwal) sebelum memberikan laporan.
+- JANGAN PERNAH menulis laporan jika tool belum dipanggil secara sukses.
+- Cukup respon dengan laporan fakta hasil eksekusi tool secara padat, singkat, dan terstruktur.
+- JANGAN memberikan basa-basi, salam pembuka/penutup, atau mengajukan pertanyaan kembali.`],
     ["human", "{input}"],
     ["placeholder", "{agent_scratchpad}"]
 ]);
@@ -38,7 +42,7 @@ export const panggilNalomi = tool(async ({ instruksi }) => {
 
     // Mio mengirimkan perintah ke Miomi
     const result = await nalomiExecutor.invoke({ input: instruksi });
-
+    console.log(`[Nalomi Response]: ${result.output}\n`);
     return result.output;
 }, {
     name: "panggil_agen_personal_nalomi",

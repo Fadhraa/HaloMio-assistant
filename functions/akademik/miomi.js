@@ -6,7 +6,8 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 
 // Import tool khusus akademik
 import { toolMenulisTugas, toolBacaTugas, toolEditTugas } from "./tugas.js";
-
+// nulis doc
+import { toolTambahGoogleDoc } from "./docs.js";
 // getcurrent time
 import { get_currentTime } from "../get_currentTime.js";
 
@@ -19,15 +20,20 @@ const otakMiomi = new ChatOllama({
 
 // 2. Beri Kepribadian dan Instruksi Khusus Miomi
 const rulesMiomi = ChatPromptTemplate.fromMessages([
-    ["system", `Kamu adalah Miomi, asisten spesialis akademik yang teliti dan cerdas milik Fadhra. 
-Fokus utamamu HANYA membantu kegiatan belajar, mencatat tugas, merangkum materi, dan hal terkait sekolah/kuliah. 
-Kerjakan instruksi yang diberikan dengan sebaik mungkin menggunakan tool yang kamu miliki.`],
+    ["system", `Kamu adalah Miomi, asisten spesialis akademik yang teliti dan cerdas milik Fadhra.
+Fokus utamamu HANYA membantu tugas sekolah/kuliah dan kegiatan belajar Fadhra menggunakan tool yang kamu miliki.
+ATURAN PENTING:
+- Jika Fadhra menyuruh membuat laporan, dokumen panjang, esai, atau google docs, gunakan tool 'tambah_google_doc'.
+- Kamu WAJIB memanggil tool yang sesuai terlebih dahulu untuk melakukan aksi (seperti 'menulis_tugas' untuk mencatat tugas baru) sebelum memberikan laporan.
+- JANGAN PERNAH menulis laporan jika tool belum dipanggil secara sukses.
+- Cukup respon dengan laporan fakta hasil eksekusi tool secara padat, singkat, dan terstruktur.
+- JANGAN memberikan basa-basi, salam pembuka/penutup, atau mengajukan pertanyaan kembali.`],
     ["human", "{input}"],
     ["placeholder", "{agent_scratchpad}"]
 ]);
 
 // 3. Gabungkan Miomi dengan Tool-nya
-const toolsMiomi = [toolMenulisTugas, toolBacaTugas, get_currentTime, toolEditTugas];
+const toolsMiomi = [toolMenulisTugas, toolBacaTugas, get_currentTime, toolEditTugas, toolTambahGoogleDoc];
 const agenMiomi = createToolCallingAgent({
     llm: otakMiomi,
     prompt: rulesMiomi,
@@ -41,7 +47,7 @@ export const panggilMiomi = tool(async ({ instruksi }) => {
 
     // Mio mengirimkan perintah ke Miomi
     const result = await miomiExecutor.invoke({ input: instruksi });
-
+    console.log(`[Miomi Response]: ${result.output}\n`);
     return result.output;
 }, {
     name: "panggil_agen_akademik_miomi",

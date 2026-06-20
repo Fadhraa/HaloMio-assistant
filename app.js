@@ -1,3 +1,5 @@
+import { config } from 'dotenv';
+config();
 import readline from 'readline';
 import { spawn } from 'child_process';
 import { ChatOllama } from "@langchain/ollama";
@@ -17,6 +19,8 @@ import { toolBukaBrowser } from './functions/buka_browser.js';
 import { get_currentTime } from "./functions/get_currentTime.js";
 // fungsi aktivitas
 import { toolCekAktivitas } from "./functions/cek_aktivitas.js";
+// Fungsi buat google doc
+import { toolTambahGoogleDoc } from "./functions/akademik/docs.js";
 // buka aplikasi
 import { toolBukaAplikasi } from "./functions/buka_aplikasi.js";
 // Membaca kebiasaan fadhra (dihapus dari sini karena sudah dipindah ke Nalomi)
@@ -36,6 +40,7 @@ ATURAN PENTING:
 1. SELALU gunakan Bahasa Indonesia yang santai, natural, dan ramah. JANGAN PERNAH menggunakan bahasa Mandarin/China atau bahasa asing lainnya kecuali Fadhra memintanya dan jangan merespon dengan bahasa yang terlalu kaku seperti robot HINDARI penggunaan kata lo/gue.
 2. Namamu adalah Mio, dan pengguna (orang yang mengajakmu bicara) bernama Fadhra. Panggil pengguna dengan nama "Fadhra". JANGAN PERNAH memanggil pengguna dengan sebutan "Mio".
 3. Jika Fadhra mengakhiri kalimatnya dengan memanggil namamu (contoh: "nama pacarku dania mio", maksudnya "nama pacarku dania, hai mio"), JANGAN menganggap kata "mio" tersebut sebagai bagian dari nama orang/benda.
+4. Jika Fadhra memberikan beberapa perintah yang berbeda dalam satu pesan sekaligus (contoh: mencatat jadwal pribadi sekaligus mencatat tugas akademik), kamu WAJIB memanggil kedua alat koordinasi sub-agen (Miomi & Nalomi) secara bersamaan (parallel tool calling).
 
 Gunakan alat (tools) yang tersedia JIKA pengguna menyuruhmu melakukan aksi di komputer (buka aplikasi/web) ATAU mencari tahu informasi yang tidak kamu ketahui.
 "Jika Fadhra menginformasikan tugas akademik, LANGSUNG gunakan alat 'panggil_agen_akademik_miomi' saat itu juga dengan informasi seadanya. JANGAN banyak bertanya detail tambahan kepada Fadhra."
@@ -53,8 +58,10 @@ const listTools = [
     get_currentTime,
     toolCekAktivitas,
     toolBukaAplikasi,
+    toolTambahGoogleDoc,
     panggilMiomi,
     panggilNalomi,
+
 ];
 
 // creating agent
@@ -91,7 +98,6 @@ async function prosesWithAi(text) {
         });
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0);
-
         console.log("Mio: ", result.output);
         // SIMPAN HISTORY (Short Term Memory)
         chatHistory.push(new HumanMessage(text));
