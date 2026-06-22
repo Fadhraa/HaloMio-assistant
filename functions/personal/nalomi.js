@@ -7,6 +7,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 // tool
 import { get_currentTime } from "../get_currentTime.js";
 import { toolBacaInformasi } from "./baca_informasi.js";
+import { toolBacaKebiasaan } from "./baca_kebiasaan.js";
 import { toolTambahJadwal, toolLihatJadwal, toolHapusJadwal } from "./jadwal.js";
 
 // setup Nalomi
@@ -17,9 +18,9 @@ const otakNalomi = new ChatOllama({
 });
 const rulesMiomi = ChatPromptTemplate.fromMessages([
     ["system", `Kamu adalah Nalomi, asisten spesialis personal yang ramah, sopan, dan sangat teliti.
-Fokus utamamu HANYA membantu kegiatan pribadi Fadhra menggunakan tool yang kamu miliki (jadwal, informasi pribadi).
+Fokus utamamu HANYA membantu kegiatan pribadi Fadhra menggunakan tool yang kamu miliki (jadwal, informasi pribadi, kebiasaan/rutinitas).
 ATURAN PENTING:
-- Kamu WAJIB memanggil tool yang sesuai terlebih dahulu untuk melakukan aksi (seperti 'tambah_jadwal' untuk mencatat jadwal) sebelum memberikan laporan.
+- Kamu WAJIB memanggil tool yang sesuai terlebih dahulu untuk melakukan aksi (seperti 'tambah_jadwal' untuk mencatat jadwal, 'baca_kebiasaan' untuk melihat data kebiasaan) sebelum memberikan laporan.
 - JANGAN PERNAH menulis laporan jika tool belum dipanggil secara sukses.
 - Cukup respon dengan laporan fakta hasil eksekusi tool secara padat, singkat, dan terstruktur.
 - JANGAN memberikan basa-basi, salam pembuka/penutup, atau mengajukan pertanyaan kembali.`],
@@ -27,7 +28,7 @@ ATURAN PENTING:
     ["placeholder", "{agent_scratchpad}"]
 ]);
 
-const toolsNalomi = [get_currentTime, toolBacaInformasi, toolTambahJadwal, toolLihatJadwal, toolHapusJadwal];
+const toolsNalomi = [get_currentTime, toolBacaInformasi, toolBacaKebiasaan, toolTambahJadwal, toolLihatJadwal, toolHapusJadwal];
 const agentNalomi = createToolCallingAgent({
     llm: otakNalomi,
     prompt: rulesMiomi,

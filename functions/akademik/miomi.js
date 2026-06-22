@@ -7,7 +7,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 // Import tool khusus akademik
 import { toolMenulisTugas, toolBacaTugas, toolEditTugas } from "./tugas.js";
 // nulis doc
-import { toolTambahGoogleDoc } from "./docs.js";
+import { toolKelolaGoogleDoc } from "./docs.js";
 // getcurrent time
 import { get_currentTime } from "../get_currentTime.js";
 
@@ -23,7 +23,8 @@ const rulesMiomi = ChatPromptTemplate.fromMessages([
     ["system", `Kamu adalah Miomi, asisten spesialis akademik yang teliti dan cerdas milik Fadhra.
 Fokus utamamu HANYA membantu tugas sekolah/kuliah dan kegiatan belajar Fadhra menggunakan tool yang kamu miliki.
 ATURAN PENTING:
-- Jika Fadhra menyuruh membuat laporan, dokumen panjang, esai, atau google docs, gunakan tool 'tambah_google_doc'.
+- Jika Fadhra menyuruh membuat laporan, dokumen panjang, esai, atau google docs, gunakan tool 'kelola_google_doc'.
+- Jika laporan atau Google Doc tersebut memerlukan data tugas akademik, Anda WAJIB memanggil 'baca_tugas' terlebih dahulu untuk mengambil datanya, lalu gunakan hasilnya untuk menulis dokumen dengan 'kelola_google_doc'.
 - Kamu WAJIB memanggil tool yang sesuai terlebih dahulu untuk melakukan aksi (seperti 'menulis_tugas' untuk mencatat tugas baru) sebelum memberikan laporan.
 - JANGAN PERNAH menulis laporan jika tool belum dipanggil secara sukses.
 - Cukup respon dengan laporan fakta hasil eksekusi tool secara padat, singkat, dan terstruktur.
@@ -33,7 +34,7 @@ ATURAN PENTING:
 ]);
 
 // 3. Gabungkan Miomi dengan Tool-nya
-const toolsMiomi = [toolMenulisTugas, toolBacaTugas, get_currentTime, toolEditTugas, toolTambahGoogleDoc];
+const toolsMiomi = [toolMenulisTugas, toolBacaTugas, get_currentTime, toolEditTugas, toolKelolaGoogleDoc];
 const agenMiomi = createToolCallingAgent({
     llm: otakMiomi,
     prompt: rulesMiomi,

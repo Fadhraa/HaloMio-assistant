@@ -1,5 +1,4 @@
-import { config } from 'dotenv';
-config();
+import 'dotenv/config';
 import readline from 'readline';
 import { spawn } from 'child_process';
 import { ChatOllama } from "@langchain/ollama";
@@ -11,6 +10,8 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 import { rekamMemoriLatar } from "./functions/background/observasi_percakapan.js";
 // fungsi  akademik
 import { panggilMiomi } from "./functions/akademik/miomi.js";
+// Fungsi file lokal
+import { toolKelolaFileLokal } from "./functions/helper/file_manager.js";
 // fungsi Personal
 import { panggilNalomi } from "./functions/personal/nalomi.js";
 // fungsi buka browser
@@ -20,7 +21,7 @@ import { get_currentTime } from "./functions/get_currentTime.js";
 // fungsi aktivitas
 import { toolCekAktivitas } from "./functions/cek_aktivitas.js";
 // Fungsi buat google doc
-import { toolTambahGoogleDoc } from "./functions/akademik/docs.js";
+import { toolKelolaGoogleDoc } from "./functions/akademik/docs.js";
 // buka aplikasi
 import { toolBukaAplikasi } from "./functions/buka_aplikasi.js";
 // Membaca kebiasaan fadhra (dihapus dari sini karena sudah dipindah ke Nalomi)
@@ -43,9 +44,14 @@ ATURAN PENTING:
 4. Jika Fadhra memberikan beberapa perintah yang berbeda dalam satu pesan sekaligus (contoh: mencatat jadwal pribadi sekaligus mencatat tugas akademik), kamu WAJIB memanggil kedua alat koordinasi sub-agen (Miomi & Nalomi) secara bersamaan (parallel tool calling).
 
 Gunakan alat (tools) yang tersedia JIKA pengguna menyuruhmu melakukan aksi di komputer (buka aplikasi/web) ATAU mencari tahu informasi yang tidak kamu ketahui.
-"Jika Fadhra menginformasikan tugas akademik, LANGSUNG gunakan alat 'panggil_agen_akademik_miomi' saat itu juga dengan informasi seadanya. JANGAN banyak bertanya detail tambahan kepada Fadhra."
-"Jika Fadhra MENANYAKAN sesuatu tentang dirinya (contoh: 'siapa nama pacarku?') ATAU menyuruh MENCATAT JADWAL/AGENDA di masa depan (contoh: 'besok jam 8 pagi aku mau ke kelurahan'), LANGSUNG gunakan alat 'panggil_agen_personal_nalomi'."
-Jika Fadhra hanya mengajak ngobrol, curhat, atau bercerita, jawablah dengan empati dan bahasa Indonesia yang santai tanpa menggunakan tool. Biarkan sistem latar belakang yang mengurus pencatatan fakta.
+
+PANDUAN PENGGUNAAN ALAT KHUSUS:
+- Jika Fadhra menyuruh MEMBUAT, MENGEDIT, MENGHAPUS, atau MELIHAT DAFTAR/JUMLAH dokumen Google Docs, gunakan alat 'kelola_google_doc'.
+- Jika Fadhra menyuruh MEMBUAT atau MEMBACA file teks, atau melihat daftar folder/file di komputer lokal, gunakan alat 'kelola_file_lokal'.
+- Jika Google Doc tersebut memerlukan data dari memori (seperti jadwal, data kebiasaan, atau informasi pribadi), Anda WAJIB memanggil 'panggil_agen_personal_nalomi' terlebih dahulu untuk mengambil data tersebut. Jika memerlukan data tugas/akademik, panggil 'panggil_agen_akademik_miomi'. Setelah mendapatkan data tersebut dari sub-agen, gunakan hasilnya untuk memanggil 'kelola_google_doc'.
+- Jika Fadhra menginformasikan tugas akademik, LANGSUNG gunakan alat 'panggil_agen_akademik_miomi' saat itu juga dengan informasi seadanya. JANGAN banyak bertanya detail tambahan kepada Fadhra.
+- Jika Fadhra MENANYAKAN sesuatu tentang dirinya (contoh: 'siapa nama pacarku?') ATAU menyuruh MENCATAT JADWAL/AGENDA di masa depan (contoh: 'besok jam 8 pagi aku mau ke kelurahan'), LANGSUNG gunakan alat 'panggil_agen_personal_nalomi'.
+- Jika Fadhra hanya mengajak ngobrol, curhat, atau bercerita, jawablah dengan empati dan bahasa Indonesia yang santai tanpa menggunakan tool. Biarkan sistem latar belakang yang mengurus pencatatan fakta.
 
 Berikut preferensi/kebiasaan Fadhra yang mungkin relevan dengan percakapan saat ini:
 {memori_kebiasaan}`],
@@ -58,7 +64,8 @@ const listTools = [
     get_currentTime,
     toolCekAktivitas,
     toolBukaAplikasi,
-    toolTambahGoogleDoc,
+    toolKelolaGoogleDoc,
+    toolKelolaFileLokal,
     panggilMiomi,
     panggilNalomi,
 
