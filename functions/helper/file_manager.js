@@ -22,12 +22,22 @@ export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTuju
 
             if (tipe === "folder") {
                 if (fs.existsSync(resolvedPath)) {
+                    const stats = fs.statSync(resolvedPath);
+                    if (stats.isFile(resolvedPath)) {
+                        return `Gagal: Target "${nama}" sudah ada di disk tetapi merupakan sebuah file, bukan folder.`;
+                    }
                     return `Folder "${nama}" sudah ada di lokasi "${relativePath || "./"}".`;
                 }
                 fs.mkdirSync(resolvedPath, { recursive: true });
                 return `Sukses membuat folder baru "${nama}" di lokasi "${relativePath || "./"}".`;
             } else if (tipe === "file") {
                 const parentDir = path.dirname(resolvedPath);
+                if (fs.existsSync(resolvedPath)) {
+                    const stats = fs.statSync(resolvedPath);
+                    if (stats.isDirectory()) {
+                        return `Gagal: Target "${nama}" sudah ada di disk tetapi merupakan sebuah folder/direktori, bukan file.`;
+                    }
+                }
                 if (!fs.existsSync(parentDir)) {
                     fs.mkdirSync(parentDir, { recursive: true });
                 }
@@ -71,6 +81,26 @@ export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTuju
             if (tipe === "file") {
                 if (!stats.isFile()) {
                     return `Gagal: Target "${targetName}" bukan merupakan file berkas teks.`;
+                }
+
+                // Filter File Biner
+                const BINARY_EXTENSIONS = [
+                    // Gambar
+                    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp", ".tiff",
+                    // Dokumen Terkompresi / Arsip
+                    ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2",
+                    // Aplikasi / Kompilasi / Executables
+                    ".exe", ".dll", ".so", ".dylib", ".bin", ".class", ".jar",
+                    // Dokumen Kompleks (non-plain-text)
+                    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+                    // Audio & Video
+                    ".mp3", ".wav", ".ogg", ".flac", ".mp4", ".avi", ".mkv", ".mov",
+                    // Database
+                    ".db", ".sqlite", ".sqlite3"
+                ];
+                const ext = path.extname(resolvedPath).toLowerCase();
+                if (BINARY_EXTENSIONS.includes(ext)) {
+                    return `Gagal: Berkas "${targetName}" terdeteksi sebagai file biner (${ext}). Tool ini hanya diizinkan membaca file dokumen teks demi keamanan dan efisiensi token.`;
                 }
                 const content = fs.readFileSync(resolvedPath, "utf-8");
                 return `Isi file "${targetName}" di lokasi "${relativePath || "./"}":\n\n${content}`;
