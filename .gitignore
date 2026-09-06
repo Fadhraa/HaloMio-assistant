@@ -8,3 +8,9 @@ __pycache__/
 memory/
 # env
 env
+.env
+# mio_workspace
+mio_workspace/
+# WhatsApp session files
+Wa_session/
+storage/

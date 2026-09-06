@@ -2,9 +2,36 @@ import fs from "fs";
 import path from "path";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+// Fungsi pembantu untuk menelusuri direktori secara rekursif
+function listDirectoryRecursive(dirPath, indent = "") {
+    let result = "";
+    try {
+        const items = fs.readdirSync(dirPath, { withFileTypes: true });
 
-export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTujuan }) => {
-    const baseDir = process.cwd(); // d:\coding\HaloMio\assistant
+        items.forEach(item => {
+            // Abaikan file/folder tersembunyi yang diawali tanda titik (.)
+            if (item.name.startsWith(".")) return;
+
+            const icon = item.isDirectory() ? "📁" : "📄";
+            result += `${indent}${icon} ${item.name}\n`;
+
+            // Jika objek adalah folder, telusuri isinya secara mendalam
+            if (item.isDirectory()) {
+                const childPath = path.join(dirPath, item.name);
+                result += listDirectoryRecursive(childPath, indent + "    ");
+            }
+        });
+    } catch (err) {
+        result += `${indent}⚠️ Gagal membaca folder: ${err.message}\n`;
+    }
+    return result;
+}
+
+export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTujuan, rekursif }) => {
+    const baseDir = path.join(process.cwd(), "mio_workspace");
+    if (!fs.existsSync(baseDir)) {
+        fs.mkdirSync(baseDir, { recursive: true });
+    }
     const relativePath = pathTujuan || "";
     const targetName = nama || "";
     const absolutePath = path.join(baseDir, relativePath, targetName);
@@ -23,7 +50,7 @@ export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTuju
             if (tipe === "folder") {
                 if (fs.existsSync(resolvedPath)) {
                     const stats = fs.statSync(resolvedPath);
-                    if (stats.isFile(resolvedPath)) {
+                    if (stats.isFile()) {
                         return `Gagal: Target "${nama}" sudah ada di disk tetapi merupakan sebuah file, bukan folder.`;
                     }
                     return `Folder "${nama}" sudah ada di lokasi "${relativePath || "./"}".`;
@@ -64,6 +91,14 @@ export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTuju
             if (tipe === "folder") {
                 if (!stats.isDirectory()) {
                     return `Gagal: Target "${targetName}" bukan merupakan folder/direktori.`;
+                }
+                // pembacaan rekursif
+                if (rekursif) {
+                    const treeResult = listDirectoryRecursive(resolvedPath);
+                    if (!treeResult) {
+                        return `Folder "${targetName || "root"}" di lokasi "${relativePath || "./"}" kosong.`;
+                    }
+                    return `Struktur folder "${targetName || "root"}" di lokasi "${relativePath || "./"}" (Rekursif):\n\n${treeResult}`;
                 }
                 const items = fs.readdirSync(resolvedPath, { withFileTypes: true });
                 if (items.length === 0) {
@@ -106,7 +141,32 @@ export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTuju
                 return `Isi file "${targetName}" di lokasi "${relativePath || "./"}":\n\n${content}`;
             }
         }
+        // --- AKSI: HAPUS ---
+        if (aksi === "hapus") {
+            if (!nama) return "Gagal: Parameter 'nama' wajib diisi untuk menghapus file atau folder.";
+            if (!fs.existsSync(resolvedPath)) {
+                return `Gagal: Target tidak ditemukan di lokasi "${relativePath || "./"}/${nama}".`;
+            }
 
+            const stats = fs.statSync(resolvedPath);
+
+            if (tipe === "folder") {
+                if (!stats.isDirectory()) {
+                    return `Gagal: Target "${nama}" bukan merupakan folder/direktori.`;
+                }
+                // Menghapus folder beserta seluruh isinya secara rekursif
+                fs.rmSync(resolvedPath, { recursive: true, force: true });
+                return `Sukses menghapus folder "${nama}" beserta seluruh isinya di lokasi "${relativePath || "./"}".`;
+            }
+
+            if (tipe === "file") {
+                if (!stats.isFile()) {
+                    return `Gagal: Target "${nama}" bukan merupakan file berkas.`;
+                }
+                fs.unlinkSync(resolvedPath);
+                return `Sukses menghapus file "${nama}" di lokasi "${relativePath || "./"}".`;
+            }
+        }
         return `Gagal: Aksi "${aksi}" dengan tipe "${tipe}" tidak didukung.`;
     } catch (error) {
         console.error("[File Manager Error]:", error);
@@ -114,12 +174,13 @@ export const toolKelolaFileLokal = tool(async ({ aksi, tipe, nama, isi, pathTuju
     }
 }, {
     name: "kelola_file_lokal",
-    description: "Gunakan alat ini untuk MEMBUAT atau MEMBACA file teks dan folder di komputer lokal (terbatas di dalam workspace HaloMio). Aksi 'buat' menulis file (menimpa jika sudah ada) atau membuat direktori. Aksi 'baca' menampilkan daftar isi direktori atau membaca isi file teks.",
+    description: "Gunakan alat ini untuk MEMBUAT, MEMBACA, atau MENGHAPUS file teks dan folder secara lokal (terbatas di dalam sandbox folder 'mio_workspace'). Aksi 'buat' menulis file (menimpa jika sudah ada) atau membuat direktori. Aksi 'baca' membaca file/direktori. Aksi 'hapus' membuang berkas/direktori secara permanen.",
     schema: z.object({
-        aksi: z.enum(["buat", "baca"]).describe("Aksi yang ingin dijalankan: 'buat' untuk menulis/membuat baru, 'baca' untuk membaca file/direktori."),
+        aksi: z.enum(["buat", "baca", "hapus"]).describe("Aksi yang ingin dijalankan: 'buat', 'baca', atau 'hapus'."),
         tipe: z.enum(["file", "folder"]).describe("Tipe objek: 'file' untuk berkas teks, 'folder' untuk direktori/folder."),
         nama: z.string().optional().describe("Nama berkas atau folder (contoh: 'index.html' atau 'src'). Kosongkan saat aksi 'baca' tipe 'folder' jika ingin membaca langsung folder di pathTujuan."),
         isi: z.string().optional().describe("Konten isi file teks (Hanya digunakan untuk aksi 'buat' dengan tipe 'file')."),
-        pathTujuan: z.string().optional().describe("Path direktori relatif di dalam workspace, dihitung dari folder asisten/ (contoh: 'memory' atau 'mio_website'). Kosongkan jika ingin mengakses root folder asisten.")
+        pathTujuan: z.string().optional().describe("Path direktori relatif di dalam sandbox 'mio_workspace' (contoh: 'mio_website' atau 'catatan'). Kosongkan jika ingin mengakses langsung root folder 'mio_workspace'."),
+        rekursif: z.boolean().optional().describe("Khusus aksi 'baca' tipe 'folder': Set 'true' jika ingin melihat seluruh isi subfolder di dalamnya secara rekursif.")
     })
 });
