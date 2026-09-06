@@ -3,6 +3,7 @@ import makeWaSocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
 } from "@whiskeysockets/baileys";
+import { prosesSimpanKeVault } from "./deduplicationService.js";
 import { getLastSyncTime, saveLastSyncedTimestamp } from "./waSyncService.js";
 import qrcode from "qrcode-terminal";
 import { periksaKeamanan } from "./extractors/keamananPrivasi.js";
@@ -11,12 +12,35 @@ import {
   ambilDataWeb,
 } from "./extractors/linkEkstraktor.js";
 import { prosesEkstraksiGambar } from "./extractors/imageEkstraktor.js";
+import { logWA } from "./waLogger.js";
 import pino from "pino";
 import path from "path";
 import fs from "fs";
 
 const SESSION_DIR = path.join(process.cwd(), "Wa_session");
 let sockWA = null;
+
+/**
+ * Menghapus pesan secara bersih dari layar obrolan tanpa meninggalkan jejak "Anda menghapus pesan ini"
+ */
+async function hapusPesanTanpaJejak(sock, msgKey, msgTimestamp, jid) {
+  try {
+    await sock.chatModify(
+      {
+        deleteForMe: {
+          deleteMedia: true,
+          key: msgKey,
+          timestamp: msgTimestamp || Math.floor(Date.now() / 1000),
+        },
+      },
+      jid,
+    );
+  } catch (err) {
+    try {
+      await sock.sendMessage(jid, { delete: msgKey });
+    } catch (e) {}
+  }
+}
 
 export function koneksiKeWA() {
   return new Promise((resolve, reject) => {
@@ -41,7 +65,7 @@ export function koneksiKeWA() {
           auth: state,
           browser: ["Mio Personal Assistant", "Chrome", "1.0.0"],
         });
-        const TARGET_GROUP_JID = GROUP_WA_ID;
+        const TARGET_GROUP_JID = process.env.GROUP_WA_ID;
 
         sockWA.ev.on("messages.upsert", async ({ messages, type }) => {
           if (type !== "notify") return;
@@ -68,17 +92,17 @@ export function koneksiKeWA() {
 
             const isGambar = !!msg.message?.imageMessage;
             if (!teksPesan && !isGambar) continue;
-            console.log(
-              `\n📨 [INCOMING VAULT CHAT]: ${teksPesan || "[Foto Praktikum]"}`,
+            logWA.info(
+              `📨 [INCOMING VAULT CHAT]: ${teksPesan || "[Foto Praktikum]"}`,
             );
             // Privacy Guardrail Check
             const cekSensitif = periksaKeamanan(teksPesan);
             if (cekSensitif.isSensitive) {
-              console.log(
+              logWA.warn(
                 `🔒 [PRIVACY GUARDRAIL TRIGGERED]: ${cekSensitif.alasan}`,
               );
-              console.log(
-                `⚠️ Pesan dibatalkan dari pengolahan AI Cloud demi keamanan data.`,
+              logWA.warn(
+                `Pesan dibatalkan dari pengolahan AI Cloud demi keamanan data.`,
               );
               if (msg.key.id) {
                 saveLastSyncedTimestamp(msgTimestamp, msg.key.id);
@@ -89,18 +113,107 @@ export function koneksiKeWA() {
             const urls = ekstrakUrldariTeks(teksPesan);
             if (urls.length > 0) {
               for (const url of urls) {
-                console.log(`🔗 Mengolah Link: ${url}`);
+                logWA.info(`🔗 Mengolah Link: ${url}`);
                 const metadata = await ambilDataWeb(url);
-                console.log(`📦 Result Extracted Link:`, metadata);
+                const hasilVault = prosesSimpanKeVault(metadata);
+                let balasanWA = "";
+                if (hasilVault.isDuplicate) {
+                  const tglAwal = new Date(
+                    hasilVault.item.created_at,
+                  ).toLocaleDateString("id-ID");
+                  balasanWA = `⚠️ *[DATA DUPLIKAT]*\nTautan ini sudah pernah kamu simpan pada ${tglAwal}.\n📌 Judul: ${hasilVault.item.judul}`;
+                } else {
+                  balasanWA = `✅ *[TERSIMPAN KE VAULT]*\n📌 *Kategori*: ${hasilVault.item.kategori.toUpperCase()}\n📌 *Judul*: ${hasilVault.item.judul}\n📝 ${hasilVault.item.ringkasan}`;
+                }
+
+                const pesanPeringatan = await sockWA.sendMessage(
+                  msg.key.remoteJid,
+                  { text: balasanWA },
+                  { quoted: msg },
+                );
+                // Jika data duplikat, hapus pesan user dan notifikasi Mio setelah 5 detik
+                if (hasilVault.isDuplicate) {
+                  setTimeout(async () => {
+                    try {
+                      // Hapus pesan duplikat dari user tanpa jejak
+                      await hapusPesanTanpaJejak(
+                        sockWA,
+                        msg.key,
+                        msgTimestamp,
+                        msg.key.remoteJid,
+                      );
+                      // Hapus notifikasi peringatan dari Mio tanpa jejak
+                      if (pesanPeringatan?.key) {
+                        await hapusPesanTanpaJejak(
+                          sockWA,
+                          pesanPeringatan.key,
+                          Math.floor(Date.now() / 1000),
+                          msg.key.remoteJid,
+                        );
+                      }
+                      logWA.info(
+                        "🧹 [AUTO-CLEANUP]: Pesan duplikat & peringatan telah dibersihkan bersih tanpa jejak!",
+                      );
+                    } catch (e) {
+                      logWA.error("[ERROR AUTO-CLEANUP]:", e);
+                    }
+                  }, 5000);
+                }
               }
             }
             // 2. Olah Gambar jika ada
             if (isGambar) {
-              console.log(
+              logWA.info(
                 `📸 Mengolah Gambar/Screenshot via Gemini Vision & Menyimpan File...`,
               );
               const hasilGambar = await prosesEkstraksiGambar(msg, msg.key);
-              console.log(`📦 Result Extracted Image:`, hasilGambar);
+              if (hasilGambar) {
+                // PROSES SIMPAN & DETEKSI DUPLIKASI
+                const hasilVault = prosesSimpanKeVault(hasilGambar);
+
+                let balasanWA = "";
+                if (hasilVault.isDuplicate) {
+                  const tglAwal = new Date(
+                    hasilVault.item.created_at,
+                  ).toLocaleDateString("id-ID");
+                  balasanWA = `⚠️ *[DATA DUPLIKAT]*\nGambar/Screenshot ini sudah pernah kamu simpan pada ${tglAwal}. (Pesan ini akan dibersihkan dalam 5 detik)`;
+                } else {
+                  balasanWA = `✅ *[TERSIMPAN KE VAULT]*\n📌 *Kategori*: ${hasilVault.item.kategori.toUpperCase()}\n📌 *Judul*: ${hasilVault.item.judul}\n📝 ${hasilVault.item.ringkasan}`;
+                }
+                // Kirim Balasan (Quote Reply) di WhatsApp
+                const pesanPeringatan = await sockWA.sendMessage(
+                  msg.key.remoteJid,
+                  { text: balasanWA },
+                  { quoted: msg },
+                );
+
+                // Jika data duplikat, hapus pesan user dan notifikasi Mio setelah 5 detik
+                if (hasilVault.isDuplicate) {
+                  setTimeout(async () => {
+                    try {
+                      await hapusPesanTanpaJejak(
+                        sockWA,
+                        msg.key,
+                        msgTimestamp,
+                        msg.key.remoteJid,
+                      );
+                      if (pesanPeringatan?.key) {
+                        await hapusPesanTanpaJejak(
+                          sockWA,
+                          pesanPeringatan.key,
+                          Math.floor(Date.now() / 1000),
+                          msg.key.remoteJid,
+                        );
+                      }
+                      logWA.info(
+                        "🧹 [AUTO-CLEANUP]: Foto duplikat & peringatan telah dibersihkan bersih tanpa jejak!",
+                      );
+                    } catch (e) {
+                      logWA.error("[ERROR AUTO-CLEANUP]:", e);
+                    }
+                  }, 5000);
+                }
+              }
             }
             if (msg.key.id) {
               saveLastSyncedTimestamp(msgTimestamp, msg.key.id);
@@ -126,44 +239,40 @@ export function koneksiKeWA() {
             console.log(
               "\n*Buka WA di HP -> Perangkat Tertaut (Linked Devices) -> Tautkan Perangkat*\n",
             );
+            logWA.info("QR Code generated for WhatsApp authentication.");
           }
 
           if (connection === "close") {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-            console.log(
-              `⚠️ Koneksi WhatsApp terputus. Status Code: ${statusCode}. Reconnect: ${shouldReconnect}`,
+            logWA.warn(
+              `Koneksi WhatsApp terputus. Status Code: ${statusCode}. Reconnect: ${shouldReconnect}`,
             );
 
             if (shouldReconnect) {
-              console.log("Mencoba menyambung kembali...");
+              logWA.info("Mencoba menyambung kembali ke WhatsApp...");
               setTimeout(() => {
                 hubungkan();
               }, 3000);
             } else {
-              console.log(
-                "❌ Sesi di-logout dari HP. Menghapus folder Wa_session...",
+              logWA.error(
+                "Sesi di-logout dari HP. Menghapus folder Wa_session...",
               );
               await fs.promises.rm(SESSION_DIR, {
                 recursive: true,
                 force: true,
               });
               sockWA = null;
-              console.log("Sesi sudah dihapus.");
+              logWA.info("Sesi folder Wa_session sudah dihapus.");
             }
           } else if (connection === "open") {
-            console.log(
-              "\n======================================================",
-            );
-            console.log("✅ WHATSAPP MIO BERHASIL TERHUBUNG & SESI TERSIMPAN!");
-            console.log(
-              "======================================================\n",
-            );
+            logWA.info("✅ WHATSAPP MIO BERHASIL TERHUBUNG & SESI TERSIMPAN!");
             resolve(sockWA); // Resolusi Promise saat koneksi sukses terbuka
           }
         });
       } catch (error) {
+        logWA.error("Gagal menghubungkan ke WhatsApp:", error);
         reject(error);
       }
     }
@@ -174,3 +283,4 @@ export function koneksiKeWA() {
 export function dapatkanSocketWA() {
   return sockWA;
 }
+

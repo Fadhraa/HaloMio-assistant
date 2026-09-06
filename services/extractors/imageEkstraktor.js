@@ -1,8 +1,11 @@
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage } from "@langchain/core/messages";
+import crypto from "crypto";
 import path from "path";
 import fs from "fs";
+import { ambilSemuaVault } from "../vaultService.js";
+import { logWA } from "../waLogger.js";
 
 const MEDIA_DIR = path.join(process.cwd(), "storage", "media");
 
@@ -14,8 +17,8 @@ function dapatVisionModel() {
       throw new Error("GEMINI_API_KEY tidak tersedia");
     }
     visionModel = new ChatGoogleGenerativeAI({
-      model: "gemini-3.1-flash-lite",
-      modelName: "gemini-3.1-flash-lite",
+      model: "gemini-1.5-flash",
+      modelName: "gemini-1.5-flash",
       apiKey: process.env.GEMINI_API_KEY,
       temperature: 0.2,
     });
@@ -27,17 +30,38 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
     if (!fs.existsSync(MEDIA_DIR)) {
       fs.mkdirSync(MEDIA_DIR, { recursive: true });
     }
+    // 1. Unduh media buffer gambar dari WhatsApp
     const buffer = await downloadMediaMessage(pesanWa, "buffer", {});
 
+    // 2. Hitung SHA-256 Hash dari byte biner file gambar fisik
+    const binaryHash = crypto.createHash("sha256").update(buffer).digest("hex");
+
+    // 3. Pre-flight Check: Cek apakah Hash Biner Gambar sudah pernah disimpan di Vault
+    const daftarVault = ambilSemuaVault();
+    const itemLama = daftarVault.find((i) => i.canonical_hash === binaryHash);
+
+    if (itemLama) {
+      logWA.info(
+        `⚡ [INSTANT BINARY DUP CHECK]: File foto fisik identik ditemukan di Vault!`,
+      );
+      return {
+        isPreCheckedDuplicate: true,
+        canonical_hash: binaryHash,
+        existingItem: itemLama,
+      };
+    }
+
+    // 4. Jika Foto Baru: Simpan file fisik ke storage/media/
     const timeStamp = Date.now();
     const namaFile = `vlt_img_${timeStamp}_${key.id}.jpg`;
     const pathFileLokal = path.join(MEDIA_DIR, namaFile);
     fs.writeFileSync(pathFileLokal, buffer);
-    console.log(`📁 Gambar disimpan ke lokal: ${pathFileLokal}`);
+    logWA.info(`📁 Gambar disimpan ke lokal: ${pathFileLokal}`);
 
     const base64Data = buffer.toString("base64");
     const dataUrl = `data:image/jpeg;base64,${base64Data}`;
 
+    // 5. Olah deskripsi & OCR via Gemini Vision
     const model = dapatVisionModel();
     const promptVision = `Analisis gambar/screenshot ini dan berikan keluaran format JSON terstruktur persis seperti berikut (tanpa blok markdown):
 {
@@ -63,8 +87,10 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
 
     let dataAI = {};
     try {
-      // Pembersihan format jika AI menyertakan blok ```json
-      const jsonClean = response.content.replace(/```json/g, "").replace(/```/g, "").trim();
+      const jsonClean = response.content
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
       dataAI = JSON.parse(jsonClean);
     } catch (e) {
       dataAI = {
@@ -81,12 +107,14 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
       kategori: dataAI.kategori || "tangkapan_layar",
       ringkasan: dataAI.ringkasan || response.content,
       tags: dataAI.tags || ["gambar"],
+      canonical_hash: binaryHash, // Sertakan Hash Biner File Fisik
       file_path: pathFileLokal,
       file_name: namaFile,
       created_at: new Date().toISOString(),
     };
   } catch (error) {
-    console.error("[ERROR IMAGE EXTRACTOR]:", error);
+    logWA.error("[ERROR IMAGE EXTRACTOR]:", error);
     return null;
   }
 }
+

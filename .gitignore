@@ -14,3 +14,4 @@ mio_workspace/
 # WhatsApp session files
 Wa_session/
 storage/
+logs/

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { logWA } from "./waLogger.js";
 
 const SYNC_FILE = path.join(process.cwd(), "memory", "wa_sync.json");
 const BATAS_MAKSIMAL_HARI = 7 * 24 * 60 * 60;
@@ -11,13 +12,13 @@ export function getLastSyncTime() {
       const detikSekarang = Math.floor(Date.now() / 1000);
       const batasTujuhHari = detikSekarang - BATAS_MAKSIMAL_HARI;
       if (data.last_synced_timestamp < batasTujuhHari) {
-        console.log("Laptop mati lebih dari 7 hari. membatalkan sync");
+        logWA.warn("Laptop mati lebih dari 7 hari. Membatalkan sync offline WA.");
         return batasTujuhHari;
       }
       return data.last_synced_timestamp || 0;
     }
   } catch (error) {
-    console.error("Gagal membaca file sync:", error);
+    logWA.error("Gagal membaca file sync:", error);
   }
   return Math.floor(Date.now() / 1000);
 }
@@ -34,6 +35,7 @@ export function saveLastSyncedTimestamp(timestampDetik, messageId = null) {
     };
     fs.writeFileSync(SYNC_FILE, JSON.stringify(payload, null, 2));
   } catch (error) {
-    console.error("[ERROR WRITE SYNC FILE]:", error);
+    logWA.error("[ERROR WRITE SYNC FILE]:", error);
   }
 }
+
