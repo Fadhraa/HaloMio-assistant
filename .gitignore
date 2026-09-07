@@ -6,6 +6,8 @@ python_venv/
 __pycache__/
 # Data Memori Aplikasi
 memory/
+# Folder Database SQLite
+database/
 # env
 env
 .env

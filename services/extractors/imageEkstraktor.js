@@ -4,7 +4,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
-import { ambilSemuaVault } from "../vaultService.js";
+import { cariVaultByHash } from "../vaultService.js";
 import { logWA } from "../waLogger.js";
 
 const MEDIA_DIR = path.join(process.cwd(), "storage", "media");
@@ -36,9 +36,8 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
     // 2. Hitung SHA-256 Hash dari byte biner file gambar fisik
     const binaryHash = crypto.createHash("sha256").update(buffer).digest("hex");
 
-    // 3. Pre-flight Check: Cek apakah Hash Biner Gambar sudah pernah disimpan di Vault
-    const daftarVault = ambilSemuaVault();
-    const itemLama = daftarVault.find((i) => i.canonical_hash === binaryHash);
+    // 3. Pre-flight Check: Cek apakah Hash Biner Gambar sudah pernah disimpan di Vault (SQLite O(1) query)
+    const itemLama = await cariVaultByHash(binaryHash);
 
     if (itemLama) {
       logWA.info(
@@ -50,6 +49,7 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
         existingItem: itemLama,
       };
     }
+
 
     // 4. Jika Foto Baru: Simpan file fisik ke storage/media/
     const timeStamp = Date.now();
@@ -117,4 +117,3 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
     return null;
   }
 }
-

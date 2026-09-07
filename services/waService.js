@@ -21,6 +21,40 @@ const SESSION_DIR = path.join(process.cwd(), "Wa_session");
 let sockWA = null;
 
 /**
+ * Ekstraksi timestamp numerik (detik) yang aman dari protobuf Baileys (number/Long object)
+ */
+function ekstrasikonversiTimestamp(rawTimestamp) {
+  if (!rawTimestamp) return Math.floor(Date.now() / 1000);
+  if (typeof rawTimestamp === "number") return rawTimestamp;
+  if (typeof rawTimestamp === "object" && rawTimestamp.low !== undefined)
+    return rawTimestamp.low;
+  const parsed = Number(rawTimestamp);
+  return isNaN(parsed) ? Math.floor(Date.now() / 1000) : parsed;
+}
+
+/**
+ * Meng-unwrap pembungkus pesan (ephemeral, viewOnce, forwarded) untuk mendapatkan payload asli
+ */
+function dapatkanPesanUnwrapped(msgContent) {
+  if (!msgContent) return {};
+  let target = msgContent;
+  while (
+    target.ephemeralMessage ||
+    target.viewOnceMessage ||
+    target.viewOnceMessageV2 ||
+    target.documentWithCaptionMessage
+  ) {
+    target =
+      target.ephemeralMessage?.message ||
+      target.viewOnceMessage?.message ||
+      target.viewOnceMessageV2?.message ||
+      target.documentWithCaptionMessage?.message ||
+      target;
+  }
+  return target;
+}
+
+/**
  * Menghapus pesan secara bersih dari layar obrolan tanpa meninggalkan jejak "Anda menghapus pesan ini"
  */
 async function hapusPesanTanpaJejak(sock, msgKey, msgTimestamp, jid) {
@@ -68,32 +102,41 @@ export function koneksiKeWA() {
         const TARGET_GROUP_JID = process.env.GROUP_WA_ID;
 
         sockWA.ev.on("messages.upsert", async ({ messages, type }) => {
-          if (type !== "notify") return;
+          // Terima event "notify" (live) DAN "append" (catch-up / backfill offline)
+          if (type !== "notify" && type !== "append") return;
           const lastSyncTime = getLastSyncTime();
-          const sortedMessages = messages.sort(
-            (a, b) => (a.messageTimestamp || 0) - (b.messageTimestamp || 0),
-          );
+          const sortedMessages = messages.sort((a, b) => {
+            const tA = ekstrasikonversiTimestamp(a.messageTimestamp);
+            const tB = ekstrasikonversiTimestamp(b.messageTimestamp);
+            return tA - tB;
+          });
+
           for (const msg of sortedMessages) {
             // Filter 1: Pesan dari diri sendiri
             if (!msg.key.fromMe) continue;
 
             // Filter 2: Harus dikirim di Grup Khusus Mio
             if (msg.key.remoteJid !== TARGET_GROUP_JID) continue;
-            const msgTimestamp =
-              msg.messageTimestamp || Math.floor(Date.now() / 1000);
+
+            const msgTimestamp = ekstrasikonversiTimestamp(msg.messageTimestamp);
             if (msgTimestamp <= lastSyncTime) {
               continue;
             }
+
+            const unwrapMsg = dapatkanPesanUnwrapped(msg.message);
+
             const teksPesan =
-              msg.message?.conversation ||
-              msg.message?.extendedTextMessage?.text ||
-              msg.message?.imageMessage?.caption ||
+              unwrapMsg?.conversation ||
+              unwrapMsg?.extendedTextMessage?.text ||
+              unwrapMsg?.imageMessage?.caption ||
+              unwrapMsg?.documentMessage?.caption ||
               "";
 
-            const isGambar = !!msg.message?.imageMessage;
+            const isGambar = !!unwrapMsg?.imageMessage;
             if (!teksPesan && !isGambar) continue;
+
             logWA.info(
-              `📨 [INCOMING VAULT CHAT]: ${teksPesan || "[Foto Praktikum]"}`,
+              `📨 [INCOMING VAULT CHAT (${type.toUpperCase()})]: ${teksPesan || "[Gambar/Foto Praktikum]"}`,
             );
             // Privacy Guardrail Check
             const cekSensitif = periksaKeamanan(teksPesan);
@@ -109,13 +152,14 @@ export function koneksiKeWA() {
               }
               continue;
             }
+
             // 1. Olah Tautan (URL) jika ada
             const urls = ekstrakUrldariTeks(teksPesan);
             if (urls.length > 0) {
               for (const url of urls) {
                 logWA.info(`🔗 Mengolah Link: ${url}`);
                 const metadata = await ambilDataWeb(url);
-                const hasilVault = prosesSimpanKeVault(metadata);
+                const hasilVault = await prosesSimpanKeVault(metadata);
                 let balasanWA = "";
                 if (hasilVault.isDuplicate) {
                   const tglAwal = new Date(
@@ -169,7 +213,7 @@ export function koneksiKeWA() {
               const hasilGambar = await prosesEkstraksiGambar(msg, msg.key);
               if (hasilGambar) {
                 // PROSES SIMPAN & DETEKSI DUPLIKASI
-                const hasilVault = prosesSimpanKeVault(hasilGambar);
+                const hasilVault = await prosesSimpanKeVault(hasilGambar);
 
                 let balasanWA = "";
                 if (hasilVault.isDuplicate) {
