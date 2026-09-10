@@ -1,9 +1,7 @@
-import fs from "fs";
-import path from "path";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatOllama } from "@langchain/ollama";
-import { HARI_INDO, BULAN_INDO } from "../functions/helper/parse_tanggal.js";
 import { bangunPromptBriefing } from "../prompts/briefingPrompt.js";
+import { getJadwalRelevanBriefing } from "./jadwalService.js";
 
 let briefingCache = {
   text: null,
@@ -36,63 +34,17 @@ export async function getBriefingDashboard(
   if (!forceRefresh && briefingCache.text && umurCache < TTL_CACHE_MS) {
     return { briefing: briefingCache.text, fromCache: true };
   }
-  const jadwalPath = path.join(process.cwd(), "memory", "jadwal.json");
-  if (!fs.existsSync(jadwalPath)) {
+
+  const { jadwalHariIni, kegiatanRelevan } = getJadwalRelevanBriefing(sekarang, 180);
+
+  if (jadwalHariIni.length === 0) {
     return {
       briefing:
         "Belum ada jadwal yang tercatat untuk hari ini. Selamat beraktivitas!",
       fromCache: false,
     };
   }
-  const rawData = fs.readFileSync(jadwalPath, "utf-8");
-  const semuaJadwal = JSON.parse(rawData);
-  const namaHariIni = HARI_INDO[sekarang.getDay()];
-  const tglHariIni = sekarang.getDate().toString().padStart(2, "0");
-  const bulanList = Object.keys(BULAN_INDO);
-  const stringTanggalHariIni = `${tglHariIni} ${bulanList[sekarang.getMonth()]} ${sekarang.getFullYear()}`;
 
-  const jadwalHariIni = semuaJadwal.filter((item) => {
-    if (item.frekuensi === "harian") return true;
-    if (item.frekuensi === "mingguan" && item.hari === namaHariIni) return true;
-    if (
-      item.frekuensi === "sekali_saja" &&
-      item.tanggal === stringTanggalHariIni
-    )
-      return true;
-    return false;
-  });
-  const menitSekarang = sekarang.getHours() * 60 + sekarang.getMinutes();
-  const batasMenitMaksimal = menitSekarang + 180;
-  const kegiatanRelevan = [];
-
-  for (const item of jadwalHariIni) {
-    const jamStr = item.jam_mulai || item.jam || "00:00";
-    const [j, m] = jamStr.split(":").map(Number);
-    const menitMulai = j * 60 + m;
-    const durasi = item.durasi || 60;
-    const menitSelesai = menitMulai + durasi;
-    const isSedangBerjalan =
-      menitSekarang >= menitMulai && menitSekarang < menitSelesai;
-    const isAkanDatang =
-      menitMulai >= menitSekarang && menitMulai <= batasMenitMaksimal;
-    if (isSedangBerjalan) {
-      kegiatanRelevan.push({
-        status: "sedang_berlangsung",
-        judul: item.judul || item.kegiatan,
-        jam: jamStr,
-        ruangan: item.ruangan,
-        dosen: item.dosen,
-      });
-    } else if (isAkanDatang) {
-      kegiatanRelevan.push({
-        status: "segera_datang",
-        judul: item.judul || item.kegiatan,
-        jam: jamStr,
-        ruangan: item.ruangan,
-        dosen: item.dosen,
-      });
-    }
-  }
   let statusJadwal = "";
   let daftarKegiatanText = "";
   if (kegiatanRelevan.length === 0) {
