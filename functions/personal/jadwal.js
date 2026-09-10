@@ -27,13 +27,32 @@ export const toolLihatJadwal = tool(
 );
 
 export const toolTambahJadwal = tool(
-  async ({ activity, type, date, day, time, duration }) => {
+  async ({
+    title,
+    category,
+    frequency,
+    day,
+    date,
+    startTime,
+    endTime,
+    lecturer,
+    room,
+    session,
+  }) => {
     // membuat file jadwal.json
     const PATH_JADWAL = path.join(process.cwd(), "memory", "jadwal.json");
     const dirPath = path.dirname(PATH_JADWAL);
     if (!fs.existsSync(dirPath)) {
       fs.mkdirSync(dirPath, { recursive: true });
     }
+
+    let durasiMenit = 60;
+    try {
+      const [h1, m1] = startTime.split(":").map(Number);
+      const [h2, m2] = endTime.split(":").map(Number);
+      durasiMenit = h2 * 60 + m2 - (h1 * 60 + m1);
+    } catch (e) {}
+
     // baca isi file jika ada
     let semuaJadwal = [];
     if (fs.existsSync(PATH_JADWAL)) {
@@ -41,16 +60,20 @@ export const toolTambahJadwal = tool(
       semuaJadwal = JSON.parse(isiFile);
     }
 
-    // masukkan jadwal baru
     const jadwalBaru = {
-      id: crypto.randomUUID(),
-      kegiatan: activity,
-      tipe: type,
-      tanggal: type === "sekali_saja" ? date : null,
-      hari: type === "berulang" ? day : null,
-      jam: time,
-      durasi: duration || 120, // Default 2 jam
-      status: "pending",
+      id: `jdw_${Date.now()}_${crypto.randomBytes(2).toString("hex")}`,
+      kategori: category || "rutinitas",
+      judul: title,
+      dosen: lecturer || null,
+      ruangan: room || null,
+      frekuensi: frequency || "mingguan",
+      hari: frequency !== "sekali_saja" ? day : null,
+      tanggal: frequency === "sekali_saja" ? date : null,
+      jam_mulai: startTime,
+      jam_selesai: endTime,
+      durasi: durasiMenit,
+      sesi_ke: session || null,
+      status: "aktif",
       dicatat_pada: new Date().toISOString(),
     };
 
@@ -63,43 +86,39 @@ export const toolTambahJadwal = tool(
       "utf-8",
     );
 
-    const detailWaktu = type === "sekali_saja" ? `pada tanggal ${date}` : `setiap hari ${day}`;
-    return `Jadwal "${activity}" (${type}) ${detailWaktu} pukul ${time} sudah Mio catat di database.`;
+    return `Jadwal "${title}" (${category}) berhasil dicatat untuk hari ${day || date} pukul ${startTime} - ${endTime}.`;
   },
   {
     name: "tambah_jadwal",
     description:
-      "Gunakan alat ini untuk mencatat jadwal Fadhra (baik jadwal sekali saja maupun jadwal rutin/berulang mingguan).",
+      "Mencatat jadwal kuliah, rutinitas, atau agenda acara Fadhra ke database.",
     schema: z.object({
-      activity: z.string().describe("Nama kegiatan atau aktivitas"),
-      type: z
-        .enum(["sekali_saja", "berulang"])
-        .describe(
-          "Tipe jadwal, apakah sekali saja atau rutin berulang setiap minggu",
-        ),
+      title: z.string().describe("Nama mata kuliah atau kegiatan"),
+      category: z
+        .enum(["kuliah", "rutinitas", "kegiatan"])
+        .describe("Kategori kegiatan"),
+      frequency: z
+        .enum(["mingguan", "harian", "sekali_saja"])
+        .describe("Frekuensi pengulangan"),
+      day: z.string().optional().describe("Nama hari (contoh: Senin, Selasa)"),
       date: z
         .string()
         .optional()
-        .describe(
-          "Tanggal kegiatan dilaksanakan jika tipe 'sekali_saja' (format: DD Bulan YYYY, contoh: 07 Maret 2026)",
-        ),
-      day: z
+        .describe("Tanggal spesifik jika sekali_saja (contoh: 2026-09-08)"),
+      startTime: z.string().describe("Jam mulai format HH:MM (contoh: 08:00)"),
+      endTime: z.string().describe("Jam selesai format HH:MM (contoh: 09:40)"),
+      lecturer: z
         .string()
         .optional()
-        .describe(
-          "Nama hari jika tipe 'berulang' (contoh: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu)",
-        ),
-      time: z
+        .describe("Nama dosen pengajar (khusus kuliah)"),
+      room: z
         .string()
-        .describe(
-          "Jam kegiatan dalam format HH:MM 24-jam (contoh: 08:00 atau 14:30)",
-        ),
-      duration: z
+        .optional()
+        .describe("Ruangan/Gedung kelas (khusus kuliah, contoh: SAW-03.08)"),
+      session: z
         .number()
         .optional()
-        .describe(
-          "Estimasi durasi kegiatan dalam menit, default 120 menit jika kosong",
-        ),
+        .describe("Urutan sesi jam ke- (khusus kuliah)"),
     }),
   },
 );

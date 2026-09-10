@@ -18,10 +18,14 @@ export function periksaKeamanan(teks) {
   if (!teks) return { isSensitive: false, alasan: null };
 
   const lowerTeks = teks.toLowerCase();
-  //   kata kunci
-  const kata_kunci = KATA_KUNCI_SENSITIF.some((kunci) =>
-    lowerTeks.includes(kunci),
-  );
+  // Periksa kata kunci sensitif dengan batasan kata (word boundary) agar tidak salah deteksi pada kata seperti "Politeknik" atau "Teknik"
+  const kata_kunci = KATA_KUNCI_SENSITIF.some((kunci) => {
+    if (kunci.length <= 4) {
+      const regexKata = new RegExp(`\\b${kunci}\\b`, "i");
+      return regexKata.test(lowerTeks);
+    }
+    return lowerTeks.includes(kunci);
+  });
   if (kata_kunci) {
     return {
       isSensitive: true,

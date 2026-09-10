@@ -17,8 +17,8 @@ function dapatVisionModel() {
       throw new Error("GEMINI_API_KEY tidak tersedia");
     }
     visionModel = new ChatGoogleGenerativeAI({
-      model: "gemini-1.5-flash",
-      modelName: "gemini-1.5-flash",
+      model: "gemini-3.5-flash",
+      modelName: "gemini-3.5-flash",
       apiKey: process.env.GEMINI_API_KEY,
       temperature: 0.2,
     });
@@ -49,7 +49,6 @@ export async function prosesEkstraksiGambar(pesanWa, key) {
         existingItem: itemLama,
       };
     }
-
 
     // 4. Jika Foto Baru: Simpan file fisik ke storage/media/
     const timeStamp = Date.now();

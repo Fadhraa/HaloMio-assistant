@@ -7,7 +7,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { jalankanMio } from "./agent.js";
 import { ambilJadwal } from "./controllers/jadwalController.js";
-
+import { getBriefingDashboard } from "./services/briefingService.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -19,8 +19,8 @@ function dapatkanVisionModel() {
       throw new Error("GEMINI_API_KEY belum dikonfigurasi di file .env");
     }
     visionModel = new ChatGoogleGenerativeAI({
-      model: "gemini-1.5-flash",
-      modelName: "gemini-1.5-flash",
+      model: "gemini-3.5-flash",
+      modelName: "gemini3.5-flash",
       apiKey: process.env.GEMINI_API_KEY,
       temperature: 0.2,
     });
@@ -104,6 +104,16 @@ export function mulaiServer(port = 3000) {
     }
   });
   app.get("/api/jadwal", ambilJadwal);
+  app.get("/api/dashboard/briefing", async (req, res) => {
+    try {
+      const isFresh = req.query.fresh === "true";
+      const hasil = await getBriefingDashboard("Fadhra", isFresh);
+      res.json(hasil);
+    } catch (err) {
+      console.error("Gagal mengambil briefing:", err);
+      res.status(500).json({ error: "Gagal memproses briefing AI" });
+    }
+  });
   // Mulai mendengarkan request
   app.listen(port, () => {
     console.log(`\n======================================================`);
